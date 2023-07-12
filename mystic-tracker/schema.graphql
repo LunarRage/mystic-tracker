@@ -1,0 +1,10 @@
+type Wallet @entity(immutable: true){
+  id: Bytes!
+  mysticAxies: [MysticAxie!]! @derivedFrom(field: "owner")
+}
+
+type MysticAxie  @entity{
+  id: Bytes!
+  tokenID: BigInt!
+  owner: Wallet!
+}

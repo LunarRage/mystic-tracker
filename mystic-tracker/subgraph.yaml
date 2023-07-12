@@ -1,0 +1,24 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: Axie
+    network: mainnet
+    source:
+      address: "0x32950db2a7164ae833121501c797d79e7b79d74c"
+      abi: Axie
+      startBlock: 2678592
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Transfer
+      abis:
+        - name: Axie
+          file: ./abis/Axie.json
+      eventHandlers:
+        - event: Transfer(indexed address,indexed address,indexed uint256)
+          handler: handleTransfer
+      file: ./src/resolver.ts
