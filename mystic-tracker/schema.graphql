@@ -8,3 +8,10 @@ type MysticAxie  @entity{
   tokenID: BigInt!
   owner: Wallet!
 }
+
+type UnregisteredAxie @entity(immutable:true){
+  id: Bytes!
+  tokenID: BigInt!
+  hexString: String!
+  txHash: String!
+}

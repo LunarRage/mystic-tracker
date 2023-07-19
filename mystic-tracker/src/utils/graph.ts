@@ -1,6 +1,5 @@
-import { Address, BigInt, Bytes, log } from "@graphprotocol/graph-ts";
-import { Transfer, Axie} from "../../generated/Axie/Axie";
-import {MysticAxie as MysticAxieEntity, Wallet as WalletEntity} from "../../generated/schema";
+import { BigInt, Bytes, log } from "@graphprotocol/graph-ts";
+import {MysticAxie as MysticAxieEntity, UnregisteredAxie as UnregisteredAxieEntity, Wallet as WalletEntity} from "../../generated/schema";
 import { AxieStore, GeneStore, MysticBase } from "./axie";
 
 
@@ -14,9 +13,22 @@ export function loadAxie(axieID: Bytes): MysticAxieEntity | null {
     return axie;
 }
 
+export function loadUnregisteredAxie(axieID: Bytes): UnregisteredAxieEntity | null {
+    const axie = UnregisteredAxieEntity.load(axieID);
+    return axie;
+}
+
 export function loadWallet(walletID: Bytes): WalletEntity | null {
     const wallet = WalletEntity.load(walletID);
     return wallet;
+}
+
+export function createNewUnregisteredAxie(axieID: Bytes, tokenID: BigInt, hexString:string, txHash:string): UnregisteredAxieEntity {
+    const axie = new UnregisteredAxieEntity(axieID);
+    axie.hexString = hexString;
+    axie.tokenID = tokenID;
+    axie.txHash = txHash;
+    return axie;
 }
 
 export function createNewMysticAxie(axieID: Bytes, tokenID: BigInt, owner:Bytes): MysticAxieEntity { 
@@ -35,8 +47,17 @@ export function saveMysticAxie(mysticAxie:MysticAxieEntity):void{
     mysticAxie.save();
 }
 
+export function saveUnregsiteredAxie(unregisteredAxie:UnregisteredAxieEntity):void{
+    unregisteredAxie.save();
+}
+
 export function saveWallet(wallet:WalletEntity):void{
     wallet.save();
+}
+
+export function changeOwner(axieEntity:MysticAxieEntity,owner:Bytes):MysticAxieEntity{
+    axieEntity.owner = owner;
+    return axieEntity;
 }
 
 // ====================================================== //
@@ -51,9 +72,23 @@ export function registerAxie(axieTransfer:AxieStore, axieMeta: GeneStore):Mystic
     }
 
     const newAxie = createNewMysticAxie(axieTransfer.axieID,axieTransfer.axieTokenID,axieTransfer.receiver);
+    log.info('Created new Mystic Axie with ID: {}', [axieTransfer.axieTokenID.toString()]);
     saveMysticAxie(newAxie);
     return newAxie; 
 
+}
+
+export function registerUnregisteredAxie(axieTransfer:AxieStore, axieMeta: GeneStore):UnregisteredAxieEntity | null {   
+    const existingAxie = loadUnregisteredAxie(axieTransfer.axieID);
+
+    if(existingAxie){
+        return null;
+    }
+
+    log.info('Storing unrecognized Axie with ID: {}', [axieTransfer.axieTokenID.toString()]);
+    const newAxie = createNewUnregisteredAxie(axieTransfer.axieID,axieTransfer.axieTokenID,axieMeta.hexString,axieTransfer.txHash.toHexString());
+    saveUnregsiteredAxie(newAxie);  
+    return newAxie;
 }
 
 export function registerWallet(axieTransfer:AxieStore):WalletEntity | null {
@@ -69,12 +104,24 @@ export function registerWallet(axieTransfer:AxieStore):WalletEntity | null {
     return newWallet;
 }
 
-export function registerAxieAndWallet(axieTransfer:AxieStore, axieMeta: GeneStore):void{
-    const potentialMysticAxie = new MysticBase(BigInt.fromString(axieTransfer.axieID.toString()), axieMeta.hexString);
-    log.info('Mystic Hex String for Axie ID: {} is {}', [potentialMysticAxie.axieID.toString(), potentialMysticAxie.binaryGenes]);
+export function updateOwner(axieID:Bytes,newOwner:Bytes):void{
+    const axieEntity = MysticAxieEntity.load(axieID);
 
-    if(potentialMysticAxie.isMystic){
-        registerAxie(axieTransfer, axieMeta);
-        registerWallet(axieTransfer);
+    if(axieEntity){
+        let updatedAxieEntity = changeOwner(axieEntity,newOwner);
+        saveMysticAxie(updatedAxieEntity);
+    }
+}
+
+export function registerAxieAndWallet(axieTransfer:AxieStore, axieMeta: GeneStore):void{
+    const potentialMysticAxie = new MysticBase(BigInt.fromString(axieTransfer.axieID.toString()), axieMeta.binaryString);
+
+   if(potentialMysticAxie.isMystic){
+       let isNewAxie = registerAxie(axieTransfer, axieMeta);
+       registerWallet(axieTransfer);
+        if(!isNewAxie){
+            log.info('Updating owner of Axie ID: {}', [axieTransfer.axieTokenID.toString()]);
+            updateOwner(axieTransfer.axieID,axieTransfer.receiver);
+        }
     }
 }
